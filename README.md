@@ -2,7 +2,6 @@
 
 一个可开源的 Codex skill 模板：从飞书/维格表多维表格读取 TikTok 链接，自动下载视频，用 Gemini 快速拆解，再把结构化结果回填到表格。
 
-这个版本已经移除私人配置。仓库里不包含任何 Base token、Table ID、API Key、账号密码、cookies 或本机绝对路径。
 
 ## 你需要准备
 
@@ -16,7 +15,6 @@ Windows 如果 `python` 指向 Microsoft Store 占位入口，可以把下面命
 
 ## 快速开始
 
-如果是给 Codex 安装，把整个仓库或 skill 子目录发给同事，让他们在 Codex 里说：
 
 ```text
 帮我从这个 GitHub 地址安装 skill：<你的 GitHub 仓库或子目录地址>
@@ -77,6 +75,6 @@ powershell -ExecutionPolicy Bypass -File scripts/run_pending.ps1
 ## 安全约定
 
 - 不提交 `.env`。
-- 不把真实 API Key、账号密码、cookies 写入代码或文档。
 - 不默认读取浏览器 cookies；只有用户明确授权时才允许把登录态作为下载备用方案。
 - 运行脚本会修改飞书表格，正式执行前先用 `--dry-run` 检查目标表和待处理记录。
+querx
