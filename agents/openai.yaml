@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feishu TikTok Video Analysis"
+  short_description: "Batch-analyze TikTok links from a Feishu Base with Gemini and write structured results back."
+
