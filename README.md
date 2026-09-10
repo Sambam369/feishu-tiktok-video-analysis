@@ -87,6 +87,6 @@ powershell -ExecutionPolicy Bypass -File scripts/run_pending.ps1
 ## 安全约定
 
 - 不提交 `.env`。
+- 不把真实 API Key、账号密码、cookies 写入代码或文档。
 - 不默认读取浏览器 cookies；只有用户明确授权时才允许把登录态作为下载备用方案。
 - 运行脚本会修改飞书表格，正式执行前先用 `--dry-run` 检查目标表和待处理记录。
-querx
