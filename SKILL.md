@@ -63,7 +63,7 @@ Important field formats:
 - `视频标题`: source caption or concise localized title.
 - `原文口播`: line-based transcript, preferably `00:00-00:03 原文句子`; use `无口播/以画面和屏幕文字为主` when appropriate.
 - `中文翻译`: line-based translation aligned with the transcript.
-- `纯口播文本`: transcript text with timestamps removed, derived from `原文口播`.
+- `纯口播文本`: Chinese spoken text with timestamps removed, derived from `中文翻译`.
 - `痛点分析`, `卖点分析`, `可复用点`: single-select values only.
 
 Read `references/workflow.md` before changing schema mappings, retry behavior, deployment, or table operations.

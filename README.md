@@ -62,7 +62,7 @@ python scripts/process_videos.py --dry-run --max-records 20
 python scripts/process_videos.py --max-records 50 --workers 3 --mode video-fast
 ```
 
-已有历史数据时，可以从 `原文口播` 批量补 `纯口播文本`：
+已有历史数据时，可以从 `中文翻译` 批量生成无时间码的中文 `纯口播文本`：
 
 ```powershell
 python scripts/process_videos.py --backfill-plain-spoken --limit 200

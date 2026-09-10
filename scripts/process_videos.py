@@ -111,13 +111,19 @@ def write_json(path, data):
 
 
 def lark_cli_path():
-    return (
+    configured = (
         RUNTIME_LARK_CLI
         or os.environ.get("LARK_CLI")
         or shutil.which("lark-cli")
         or shutil.which("lark-cli.cmd")
         or "lark-cli"
     )
+    path = Path(configured)
+    if os.name == "nt" and path.suffix.lower() == ".cmd":
+        native = path.parent / "node_modules" / "@larksuite" / "cli" / "bin" / "lark-cli.exe"
+        if native.exists():
+            return str(native)
+    return configured
 
 
 def meowload_path():
@@ -232,20 +238,35 @@ def update_records(base_token, table_id, updates, label, field_names=None):
         return None
     path = OUTPUT_ROOT / f"{label}_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     write_json(path, {"update_records": updates})
-    command = [
-        lark_cli_path(),
-        "base",
-        "+record-batch-update",
-        "--base-token",
-        base_token,
-        "--table-id",
-        table_id,
-        "--json",
-        f"@{path}",
-    ]
-    result = run_command(command, timeout=90)
-    if result["code"] != 0:
-        raise RuntimeError(result["stderr"] or result["stdout"])
+    batches = []
+    current = {}
+    for record_id, fields in updates.items():
+        candidate = {**current, record_id: fields}
+        payload = json.dumps({"update_records": candidate}, ensure_ascii=False, separators=(",", ":"))
+        if current and len(payload) > 24000:
+            batches.append(current)
+            current = {record_id: fields}
+        else:
+            current = candidate
+    if current:
+        batches.append(current)
+
+    for batch in batches:
+        payload = json.dumps({"update_records": batch}, ensure_ascii=False, separators=(",", ":"))
+        command = [
+            lark_cli_path(),
+            "base",
+            "+record-batch-update",
+            "--base-token",
+            base_token,
+            "--table-id",
+            table_id,
+            "--json",
+            payload,
+        ]
+        result = run_command(command, timeout=90)
+        if result["code"] != 0:
+            raise RuntimeError(result["stderr"] or result["stdout"])
     return path
 
 
@@ -724,8 +745,8 @@ def build_update(record, metadata, analysis, method, download_seconds, analysis_
         "视频框架": normalize_framework(analysis.get("video_framework") or analysis.get("script_structure")),
         title_field: pick_video_title(metadata, analysis),
         "原文口播": normalize_timed_text(analysis.get("spoken_transcript"), "无口播/以画面和屏幕文字为主"),
-        "纯口播文本": normalize_plain_spoken_text(analysis.get("spoken_transcript")),
         "中文翻译": normalize_timed_text(analysis.get("chinese_translation"), "无口播/以画面和屏幕文字为主"),
+        "纯口播文本": normalize_plain_spoken_text(analysis.get("chinese_translation")),
         "完整分镜脚本": normalize_timed_text(analysis.get("shot_breakdown"), "无明显分镜/以单镜头展示为主"),
         "痛点分析": [select_from_text(analysis.get("pain_points"), PAIN_POINTS, "痛点不明确", PAIN_PRIORITY)],
         "卖点分析": [select_from_text(analysis.get("selling_points"), SELLING_POINTS, "卖点不明确", SELLING_PRIORITY)],
@@ -773,12 +794,12 @@ def failure_update(reason, detail):
 
 
 def backfill_plain_spoken_text(base_token, table_id, limit, field_names, force=False):
-    required = {"原文口播", "纯口播文本"}
+    required = {"中文翻译", "纯口播文本"}
     missing = sorted(required - set(field_names or []))
     if missing:
         raise RuntimeError(f"表格缺少必需字段：{', '.join(missing)}")
 
-    requested_fields = ["原文口播", "纯口播文本"]
+    requested_fields = ["中文翻译", "纯口播文本"]
     command = [
         lark_cli_path(),
         "base",
@@ -810,7 +831,7 @@ def backfill_plain_spoken_text(base_token, table_id, limit, field_names, force=F
         if not source_text or (current_text and not force):
             continue
         plain = normalize_plain_spoken_text(source_text)
-        if plain and plain != "无口播/以画面和屏幕文字为主":
+        if plain:
             updates[record_id] = {"纯口播文本": plain}
 
     path = None
@@ -922,7 +943,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--skip-table-write", action="store_true")
     parser.add_argument("--record-ids", default="", help="Comma-separated record IDs to process regardless of current status.")
-    parser.add_argument("--backfill-plain-spoken", action="store_true", help="Populate 纯口播文本 from existing 原文口播 values, then exit.")
+    parser.add_argument("--backfill-plain-spoken", action="store_true", help="Populate Chinese 纯口播文本 from existing 中文翻译 values, then exit.")
     parser.add_argument("--force-backfill", action="store_true", help="Overwrite existing 纯口播文本 during --backfill-plain-spoken.")
     args = parser.parse_args()
     RUNTIME_LARK_CLI = args.lark_cli

@@ -10,7 +10,9 @@ This skill turns a Feishu/Lark Base into a TikTok video-analysis queue:
 4. The runner sends VTT subtitles and/or the MP4 video to Gemini.
 5. Gemini returns normalized JSON.
 6. The runner writes analysis fields back to the same row.
-7. `纯口播文本` is derived locally from `原文口播` by removing timestamps.
+7. `纯口播文本` is derived locally from `中文翻译` by removing timestamps, so its content is always Chinese.
+
+On Windows, the runner resolves the npm `.cmd` wrapper to the native `lark-cli.exe` and sends batch JSON inline to avoid intermittent `@file` realpath permission errors.
 
 ## Required Configuration
 
