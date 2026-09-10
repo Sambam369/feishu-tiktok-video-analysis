@@ -62,6 +62,18 @@ python scripts/process_videos.py --dry-run --max-records 20
 python scripts/process_videos.py --max-records 50 --workers 3 --mode video-fast
 ```
 
+已有历史数据时，可以从 `原文口播` 批量补 `纯口播文本`：
+
+```powershell
+python scripts/process_videos.py --backfill-plain-spoken --limit 200
+```
+
+如果要重刷已经存在的 `纯口播文本`：
+
+```powershell
+python scripts/process_videos.py --backfill-plain-spoken --force-backfill --limit 200
+```
+
 ## 自动化运行
 
 Windows 可以用任务计划程序定时执行：

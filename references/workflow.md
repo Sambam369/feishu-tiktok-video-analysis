@@ -10,6 +10,7 @@ This skill turns a Feishu/Lark Base into a TikTok video-analysis queue:
 4. The runner sends VTT subtitles and/or the MP4 video to Gemini.
 5. Gemini returns normalized JSON.
 6. The runner writes analysis fields back to the same row.
+7. `纯口播文本` is derived locally from `原文口播` by removing timestamps.
 
 ## Required Configuration
 
@@ -29,7 +30,7 @@ The recommended schema is stored in `references/table_schema.json`. It is intent
 
 - Operational fields: link, status, owner, finish time, failure reason.
 - Source metrics: platform, creator, publish time, duration, views, likes, comments, saves, shares, engagement rate.
-- Analysis fields: title, transcript, translation, framework, shot script, type/mode/hook, pain point, selling point, reusable point, risk note.
+- Analysis fields: title, transcript, translation, pure transcript text, framework, shot script, type/mode/hook, pain point, selling point, reusable point, risk note.
 - Runtime fields: downloader, download seconds, analysis seconds, estimated AI cost, analysis version.
 
 The processing script filters writes against the live field list, so teams can delete fields they do not need without breaking the run.
@@ -82,4 +83,3 @@ Feishu automation or webhook:
 - `AI解析完成`: Gemini analysis has been written.
 - `待人工处理`: downloader or parser failed after supported fallbacks.
 - `已完成`: optional human-reviewed final state.
-

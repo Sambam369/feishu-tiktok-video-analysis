@@ -58,6 +58,7 @@
   {"name":"视频标题","type":"text","style":{"type":"plain"}},
   {"name":"原文口播","type":"text","style":{"type":"plain"}},
   {"name":"中文翻译","type":"text","style":{"type":"plain"}},
+  {"name":"纯口播文本","type":"text","style":{"type":"plain"}},
   {"name":"视频框架","type":"text","style":{"type":"plain"}},
   {"name":"完整分镜脚本","type":"text","style":{"type":"plain"}},
   {"name":"视频类型","type":"select","multiple":false,"options":[
@@ -124,4 +125,3 @@
   {"name":"AI成本预估(元)","type":"number","style":{"type":"plain","precision":2,"thousands_separator":false,"percentage":false}},
   {"name":"分析版本","type":"text","style":{"type":"plain"}}
 ]
-

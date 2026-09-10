@@ -575,6 +575,36 @@ def normalize_timed_text(value, empty="无"):
     return "\n".join(lines)
 
 
+def strip_timecode(line):
+    text = clean_list_line(line)
+    text = re.sub(r"^\s*[-–—]?\s*结束\s*", "", text)
+    text = re.sub(r"\b(?:start|end)\s*:\s*(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d+)?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\btext\s*:\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"\[?\s*(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d+)?\s*(?:-->|-|–|—|~|至|到)\s*(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d+)?\s*\]?",
+        " ",
+        text,
+    )
+    text = re.sub(r"\[?\s*(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d+)?\s*\]?", " ", text)
+    text = re.sub(
+        r"^\s*(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d+)?\s*(?:-->|-|–|—|~|至|到)\s*(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d+)?\s*",
+        "",
+        text,
+    )
+    text = re.sub(r"^\s*(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d+)?\s*", "", text)
+    return re.sub(r"\s+", " ", text).strip(" -–—")
+
+
+def normalize_plain_spoken_text(value, empty="无口播/以画面和屏幕文字为主"):
+    lines = [strip_timecode(line) for line in flatten_value(value)]
+    lines = [line for line in lines if line and line not in {"[]", "{}", "无", "N/A", "n/a"}]
+    if not lines:
+        return empty
+    text = " ".join(lines)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or empty
+
+
 def clean_tag(tag, max_len=12):
     tag = re.sub(r"^[#\s\-\d\).、:：]+", "", str(tag or ""))
     tag = re.sub(r"^(痛点|卖点|可复用点|标签|Tag|tag)[:：]", "", tag).strip()
@@ -694,6 +724,7 @@ def build_update(record, metadata, analysis, method, download_seconds, analysis_
         "视频框架": normalize_framework(analysis.get("video_framework") or analysis.get("script_structure")),
         title_field: pick_video_title(metadata, analysis),
         "原文口播": normalize_timed_text(analysis.get("spoken_transcript"), "无口播/以画面和屏幕文字为主"),
+        "纯口播文本": normalize_plain_spoken_text(analysis.get("spoken_transcript")),
         "中文翻译": normalize_timed_text(analysis.get("chinese_translation"), "无口播/以画面和屏幕文字为主"),
         "完整分镜脚本": normalize_timed_text(analysis.get("shot_breakdown"), "无明显分镜/以单镜头展示为主"),
         "痛点分析": [select_from_text(analysis.get("pain_points"), PAIN_POINTS, "痛点不明确", PAIN_PRIORITY)],
@@ -739,6 +770,63 @@ def failure_update(reason, detail):
         "完成时间": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "分析版本": "v1.0-fast-batch-failed",
     }
+
+
+def backfill_plain_spoken_text(base_token, table_id, limit, field_names, force=False):
+    required = {"原文口播", "纯口播文本"}
+    missing = sorted(required - set(field_names or []))
+    if missing:
+        raise RuntimeError(f"表格缺少必需字段：{', '.join(missing)}")
+
+    requested_fields = ["原文口播", "纯口播文本"]
+    command = [
+        lark_cli_path(),
+        "base",
+        "+record-list",
+        "--base-token",
+        base_token,
+        "--table-id",
+        table_id,
+        "--limit",
+        str(limit),
+        "--format",
+        "json",
+    ]
+    for field_name in requested_fields:
+        command.extend(["--field-id", field_name])
+    result = run_command(command, timeout=60)
+    if result["code"] != 0:
+        raise RuntimeError(result["stderr"] or result["stdout"])
+
+    payload = json.loads(result["stdout"])
+    data = payload.get("data", {}).get("data", [])
+    returned_record_ids = payload.get("data", {}).get("record_id_list", [])
+    updates = {}
+    for record_id, row in zip(returned_record_ids, data):
+        source = row[0] if len(row) > 0 else ""
+        current = row[1] if len(row) > 1 else ""
+        source_text = as_text(source)
+        current_text = as_text(current)
+        if not source_text or (current_text and not force):
+            continue
+        plain = normalize_plain_spoken_text(source_text)
+        if plain and plain != "无口播/以画面和屏幕文字为主":
+            updates[record_id] = {"纯口播文本": plain}
+
+    path = None
+    if updates:
+        path = update_records(base_token, table_id, updates, "plain_spoken_backfill", field_names=field_names)
+    print(
+        json.dumps(
+            {
+                "scanned_records": len(data),
+                "backfill_count": len(updates),
+                "update_file": str(path) if path else None,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 def process_one(record, args, field_names):
@@ -834,6 +922,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--skip-table-write", action="store_true")
     parser.add_argument("--record-ids", default="", help="Comma-separated record IDs to process regardless of current status.")
+    parser.add_argument("--backfill-plain-spoken", action="store_true", help="Populate 纯口播文本 from existing 原文口播 values, then exit.")
+    parser.add_argument("--force-backfill", action="store_true", help="Overwrite existing 纯口播文本 during --backfill-plain-spoken.")
     args = parser.parse_args()
     RUNTIME_LARK_CLI = args.lark_cli
     RUNTIME_MEOWLOAD_BIN = args.meowload_bin
@@ -847,6 +937,10 @@ def main():
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
     field_names = fetch_field_names(args.base_token, args.table_id)
+    if args.backfill_plain_spoken:
+        backfill_plain_spoken_text(args.base_token, args.table_id, args.limit, field_names, force=args.force_backfill)
+        return
+
     requested_ids = {item.strip() for item in args.record_ids.split(",") if item.strip()}
     records = fetch_pending_records(
         args.base_token,
